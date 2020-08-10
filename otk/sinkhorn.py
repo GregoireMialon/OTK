@@ -98,6 +98,31 @@ def multihead_attn(input, weight, mask=None, eps=1.0, return_kernel=False,
     K = K.permute(0, 3, 1, 2).contiguous()
     return K
 
+def query_multihead_attn(input, weight, mask=None, return_kernel=False,
+                   position_filter=None):
+    """Comput the attention weight using the references as queries
+    input: n x in_size x in_dim
+    mask: n x in_size
+    weight: m x out_size x in_dim (m: number of heads/ref)
+    output: n x out_size x m x in_size
+    """
+    n, in_size, in_dim = input.shape
+    m, out_size = weight.shape[:-1]
+    K = torch.tensordot(input, weight, dims=[[-1], [-1]])
+    K = K.permute(0, 2, 1, 3)
+    if position_filter is not None:
+        K = position_filter * K
+    # K: n x m x in_size x out_size
+    K = K.reshape(-1, in_size, out_size)
+    # K: nm x in_size x out_size
+    if return_kernel:
+        return K.reshape(n, m)
+    K = K.reshape(n, m, in_size, out_size)
+    if position_filter is not None:
+        K = position_filter * K
+    K = K.permute(0, 3, 1, 2).contiguous()
+    return K
+
 def wasserstein_barycenter(x, c, eps=1.0, max_iter=100, sinkhorn_iter=50, log_domain=False):
     """
     x: n x in_size x in_dim

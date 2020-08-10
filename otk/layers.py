@@ -4,7 +4,7 @@ import math
 from torch import nn
 import torch.optim as optim
 from .utils import spherical_kmeans, normalize
-from .sinkhorn import wasserstein_kmeans, multihead_attn
+from .sinkhorn import wasserstein_kmeans, multihead_attn, query_multihead_attn
 
 
 class OTKernel(nn.Module):
@@ -165,3 +165,16 @@ class Linear(nn.Linear):
             scores = scores.argmax(-1)
             scores = scores.cpu()
         return torch.mean((scores == y).float()).item()
+
+
+class QueryKernel(OTKernel):
+    def get_attn(self, input, mask=None, position_filter=None):
+        """Compute the attention weight using Sinkhorn OT
+        input: batch_size x in_size x in_dim
+        mask: batch_size x in_size
+        self.weight: heads x out_size x in_dim
+        output: batch_size x (out_size x heads) x in_size
+        """
+        return query_multihead_attn(
+            input, self.weight, mask=mask,
+            position_filter=position_filter)
