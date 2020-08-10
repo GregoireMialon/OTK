@@ -120,8 +120,8 @@ def query_multihead_attn(input, weight, mask=None, return_kernel=False,
     K = K.reshape(n, m, in_size, out_size)
     if position_filter is not None:
         K = position_filter * K
-    K = K.permute(0, 3, 1, 2).contiguous()
-    return K
+    K = torch.nn.Softmax(dim=2)(K / math.sqrt(in_dim))
+    return K.permute(0, 3, 1, 2).contiguous()
 
 def wasserstein_barycenter(x, c, eps=1.0, max_iter=100, sinkhorn_iter=50, log_domain=False):
     """
