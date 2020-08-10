@@ -2,7 +2,7 @@ import os
 import argparse
 
 from ckn.data.loader_scop import load_data
-from otk.models import SeqAttention
+from otk.models import SeqAttention, QuerySeqAttention
 from torch.utils.data import DataLoader
 import torch
 from torch import nn
@@ -67,6 +67,8 @@ def load_args():
         help='initial learning rate')
     parser.add_argument("--alternating", action='store_true',
         help='alternating training')
+    parser.add_argument("--baseline", type=str, default='ours',
+                        choices=['ours', 'query'])
     args = parser.parse_args()
     args.use_cuda = torch.cuda.is_available()
     # check shape
@@ -232,11 +234,18 @@ def main():
         val_loader = DataLoader(
             val_dset, batch_size=args.batch_size, shuffle=False, **loader_args)
 
-    model = SeqAttention(
-        45, 1195, args.n_filters, args.len_motifs, args.subsamplings,
-        kernel_args=args.kernel_params, alpha=args.weight_decay,
-        eps=args.eps, heads=args.heads, out_size=args.out_size,
-        max_iter=args.max_iter)
+    if args.baseline == 'query':
+        model = QuerySeqAttention(
+            45, 1195, args.n_filters, args.len_motifs, args.subsamplings,
+            kernel_args=args.kernel_params, alpha=args.weight_decay,
+            eps=args.eps, heads=args.heads, out_size=args.out_size,
+            max_iter=args.max_iter)
+    else:
+        model = SeqAttention(
+            45, 1195, args.n_filters, args.len_motifs, args.subsamplings,
+            kernel_args=args.kernel_params, alpha=args.weight_decay,
+            eps=args.eps, heads=args.heads, out_size=args.out_size,
+            max_iter=args.max_iter)
     print(model)
     print(len(train_dset))
 
