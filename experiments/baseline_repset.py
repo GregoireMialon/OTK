@@ -43,7 +43,7 @@ def load_args():
     parser.add_argument(
         '--dim-hidden', type=int, default=768, help='dimension of each vector')
     parser.add_argument(
-        "--outdir", default="repset", type=str, help="output path")
+        "--outdir", default="results/repset", type=str, help="output path")
     parser.add_argument("--lr", type=float, default=0.01,
         help='initial learning rate')
     args = parser.parse_args()
@@ -147,10 +147,17 @@ def main():
         "train_err=", "{:.5f}".format(train_err.avg), "test_loss=", "{:.5f}".format(test_loss.avg), "test_err=", "{:.5f}".format(test_err.avg))
     print()
 
-    errs.append(test_err.avg)
+    print("Test acc:", "{:.5f}".format(1 - test_err.avg))
 
-    print("Average error:", "{:.5f}".format(np.mean(errs)))
-    print("Standard deviation:", "{:.5f}".format(np.std(errs)))
+    if args.save_logs:
+        print('Saving logs...')
+        data = {
+            'score': 1 - test_err.avg,
+            'train_acc': 1 - train_err.avg,
+            'args': args
+            }
+        np.save(os.path.join(args.outdir, f"seed_{args.seed}_results.npy"),
+                data)
     return
 
 if __name__ == "__main__":
