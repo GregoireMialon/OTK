@@ -76,6 +76,7 @@ def load_args():
 def main():
     args = load_args()
     print(args)
+    np.random.seed(args.seed)
     errs = list()
 
     X_train, y_train, X_test, y_test, _ = load_data(dataset=args.dataset)
