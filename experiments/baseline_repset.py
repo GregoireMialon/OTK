@@ -13,10 +13,9 @@ from repset.repset.models import RepSet
 from repset.repset.utils import AverageMeter
 
 """
-This is a baseline using the code from the paper http://proceedings.mlr.press/v108/skianis20a/skianis20a.pdf.
+This is the RepSet baseline using the code from the paper
+http://proceedings.mlr.press/v108/skianis20a/skianis20a.pdf.
 """
-
-errs = list()
 
 def load_args():
     parser = argparse.ArgumentParser(
@@ -33,9 +32,6 @@ def load_args():
     parser.add_argument(
         '--epochs', type=int, default=10, metavar='N',
         help='number of epochs to train')
-    parser.add_argument(
-        "--weight-decay", type=float, default=1e-05,
-        help="weight decay for classifier")
     parser.add_argument(
         '--heads', type=int, default=10, help='number of heads for attention layer')
     parser.add_argument(
@@ -59,8 +55,8 @@ def load_args():
                 os.makedirs(outdir)
             except:
                 pass
-        outdir = outdir+'/learning_{}_{}_{}'.format(
-            args.batch_size, args.epochs, args.weight_decay)
+        outdir = outdir+'/learning_{}_{}'.format(
+            args.batch_size, args.epochs)
         if not os.path.exists(outdir):
             try:
                 os.makedirs(outdir)
@@ -82,19 +78,14 @@ def main():
     print(args)
     errs = list()
 
-    X_train, y_train, X_val, y_val, _ = load_data(dataset=args.dataset)
-    mask_train, mask_val, _ = load_masks(args.dataset)
+    X_train, y_train, X_test, y_test, _ = load_data(dataset=args.dataset)
+    mask_train, mask_test, _ = load_masks(args.dataset)
 
     X_train *= mask_train
-    X_val *= mask_val
-
-    nb_train = int(0.8 * X_train.shape[0])
+    X_test *= mask_test
 
     X_train = X_train.permute(0, 2, 1).numpy()
-    X_val = X_val.permute(0, 2, 1).numpy()
-
-    X_test, y_test = X_train[nb_train:], y_train[nb_train:]
-    X_train, y_train = X_train[:nb_train], y_train[:nb_train]
+    X_test = X_test.permute(0, 2, 1).numpy()
 
     n_train = y_train.shape[0]
     n_test = y_test.shape[0]
