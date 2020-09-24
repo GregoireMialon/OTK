@@ -1,4 +1,5 @@
 import argparse
+import copy
 from math import ceil
 import numpy as np
 import os
@@ -40,7 +41,7 @@ def load_args():
     parser.add_argument(
         '--dim-hidden', type=int, default=768, help='dimension of each vector')
     parser.add_argument(
-        "--outdir", default="results/approxrepset", type=str, help="output path")
+        "--outdir", default="results/", type=str, help="output path")
     args = parser.parse_args()
     args.use_cuda = torch.cuda.is_available()
     # check shape
@@ -54,6 +55,7 @@ def load_args():
                 os.makedirs(outdir)
             except:
                 pass
+        outdir = outdir + "/sup"
         if not os.path.exists(outdir):
             try:
                 os.makedirs(outdir)
@@ -109,7 +111,9 @@ def main():
     y_test_[np.arange(y_test.size),y_test] = 1 # added that
     y_test = y_test_
 
-    n_train = y_train.shape[0]
+    n_train = int(0.8 * X_train.shape[0])
+    n_val = X_train.shape[0] - n_train
+    # n_train = y_train.shape[0]
     n_test = y_test.shape[0]
 
     idx = np.random.permutation(n_train)
@@ -126,6 +130,21 @@ def main():
         X = torch.FloatTensor(X).to(device)
         y = torch.LongTensor(np.where(y_train[idx[i * args.batch_size:min((i + 1) * args.batch_size, n_train)]])[1]).to(device)
         train_batches.append((X, y))
+
+    idx = np.random.permutation(range(n_train, X_train.shape[0]))
+    n_val_batches = ceil(n_val / args.batch_size)
+    val_batches = list()
+
+    for i in range(n_val_batches):
+        max_card = max([X_train[idx[j]].shape[1] for j in range(
+            i * args.batch_size,min(( i+ 1) * args.batch_size, n_val))])
+        X = np.zeros((min((i + 1) * args.batch_size, n_val) - i * args.batch_size,
+                      max_card, args.dim_hidden))
+        for j in range(i * args.batch_size, min((i + 1) * args.batch_size, n_val)):
+            X[j - i * args.batch_size, :X_train[idx[j]].shape[1], :] = X_train[idx[j]].T
+        X = torch.FloatTensor(X).to(device)
+        y = torch.LongTensor(np.where(y_train[idx[i * args.batch_size:min((i + 1) * args.batch_size, n_val)]])[1]).to(device)
+        val_batches.append((X, y))
 
     n_test_batches = ceil(n_test / args.batch_size)
     test_batches = list()
@@ -160,9 +179,10 @@ def main():
         loss_test = F.cross_entropy(output, y)
         return output, loss_test
 
-    model.train()
+    best_loss = float('inf')
     for epoch in range(args.epochs):
 
+        model.train()
         train_loss = AverageMeter()
         train_err = AverageMeter()
 
@@ -171,10 +191,24 @@ def main():
 
             train_loss.update(loss.item(), output.size(0))
             train_err.update(1 - accuracy(output.data, y.data), output.size(0))
+        
+        model.eval()
+
+        for X, y in val_batches:
+            val_output, val_loss = test(X, y)
+            val_acc = accuracy(val_output.data, y.data)
+            if val_loss < best_loss:
+                best_loss = val_loss
+                best_acc = val_acc
+                best_epoch = epoch + 1
+                best_weights = copy.deepcopy(model.state_dict())
 
         print("epoch:", '%03d' % (epoch+1), "train_loss=", "{:.5f}".format(train_loss.avg),
-            "train_err=", "{:.5f}".format(train_err.avg))
+            "train_acc=", "{:.5f}".format(1 - train_err.avg), "val_loss= {}".format(val_loss),
+            "val_acc= {}".format(val_acc))
 
+    model.load_state_dict(best_weights)
+    print("Testing...")
     model.eval()
 
     test_loss = AverageMeter()
@@ -187,7 +221,9 @@ def main():
         test_err.update(1 - accuracy(output.data, y.data), output.size(0))
 
     print("train_loss=", "{:.5f}".format(train_loss.avg),
-        "train_err=", "{:.5f}".format(train_err.avg), "test_loss=", "{:.5f}".format(test_loss.avg), "test_err=", "{:.5f}".format(test_err.avg))
+          "train_acc=", "{:.5f}".format(1 - train_err.avg),
+          "test_loss=", "{:.5f}".format(test_loss.avg),
+          "test_acc=", "{:.5f}".format(1 - test_err.avg))
     print()
 
     errs.append(test_err.avg.cpu())
@@ -198,7 +234,10 @@ def main():
         print('Saving logs...')
         data = {
             'score': 1 - test_err.avg,
+            'best_epoch': best_epoch,
+            'best_loss': best_loss,
             'train_acc': 1 - train_err.avg,
+            'val_score': best_acc,
             'args': args
             }
         np.save(os.path.join(args.outdir, f"seed_{args.seed}_results.npy"),
