@@ -39,9 +39,9 @@ def load_args():
     parser.add_argument(
         '--dim-hidden', type=int, default=768, help='dimension of each vector')
     parser.add_argument(
-        "--outdir", default="results/repset", type=str, help="output path")
-    parser.add_argument("--lr", type=float, default=0.01,
-        help='initial learning rate')
+        "--outdir", default="results/", type=str, help="output path")
+    parser.add_argument(
+        "--lr", type=float, default=0.01, help='initial learning rate')
     args = parser.parse_args()
     args.use_cuda = torch.cuda.is_available()
     # check shape
@@ -49,14 +49,26 @@ def load_args():
     args.save_logs = False
     if args.outdir != "":
         args.save_logs = True
-        outdir = args.outdir
+        outdir = args.outdir + args.dataset
         if not os.path.exists(outdir):
             try:
                 os.makedirs(outdir)
             except:
                 pass
-        outdir = outdir+'/learning_{}_{}'.format(
-            args.batch_size, args.epochs)
+        outdir = outdir + "/sup"
+        if not os.path.exists(outdir):
+            try:
+                os.makedirs(outdir)
+            except:
+                pass
+        outdir = outdir + f"/repset"
+        if not os.path.exists(outdir):
+            try:
+                os.makedirs(outdir)
+            except:
+                pass
+        outdir = outdir+'/learning_{}_{}_{}'.format(
+            args.batch_size, args.epochs, args.lr)
         if not os.path.exists(outdir):
             try:
                 os.makedirs(outdir)

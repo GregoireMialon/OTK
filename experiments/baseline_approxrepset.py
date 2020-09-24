@@ -48,14 +48,25 @@ def load_args():
     args.save_logs = False
     if args.outdir != "":
         args.save_logs = True
-        outdir = args.outdir
+        outdir = args.outdir + args.dataset
         if not os.path.exists(outdir):
             try:
                 os.makedirs(outdir)
             except:
                 pass
-        outdir = outdir + '/learning_{}_{}'.format(
-            args.batch_size, args.epochs)
+        if not os.path.exists(outdir):
+            try:
+                os.makedirs(outdir)
+            except:
+                pass
+        outdir = outdir + f"/approxrepset"
+        if not os.path.exists(outdir):
+            try:
+                os.makedirs(outdir)
+            except:
+                pass
+        outdir = outdir + '/learning_{}_{}_{}'.format(
+            args.batch_size, args.epochs, args.lr)
         if not os.path.exists(outdir):
             try:
                 os.makedirs(outdir)
