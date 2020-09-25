@@ -193,19 +193,23 @@ def main():
             train_err.update(1 - accuracy(output.data, y.data), output.size(0))
         
         model.eval()
+        val_loss = AverageMeter()
+        val_acc = AverageMeter()
 
         for X, y in val_batches:
-            val_output, val_loss = test(X, y)
-            val_acc = accuracy(val_output.data, y.data)
-            if val_loss < best_loss:
-                best_loss = val_loss
-                best_acc = val_acc
-                best_epoch = epoch + 1
-                best_weights = copy.deepcopy(model.state_dict())
+            output, loss = test(X, y)
+            val_loss.update(loss.item(), output.size(0))
+            val_acc.update(accuracy(output.data, y.data), output.size(0))
+        
+        if val_loss.avg < best_loss:
+            best_loss = val_loss.avg
+            best_acc = val_acc.avg
+            best_epoch = epoch + 1
+            best_weights = copy.deepcopy(model.state_dict())
 
         print("epoch:", '%03d' % (epoch+1), "train_loss=", "{:.5f}".format(train_loss.avg),
-            "train_acc=", "{:.5f}".format(1 - train_err.avg), "val_loss= {}".format(val_loss),
-            "val_acc= {}".format(val_acc))
+            "train_acc=", "{:.5f}".format(1 - train_err.avg), "val_loss= {}".format(val_loss.avg),
+            "val_acc= {}".format(val_acc.avg))
 
     model.load_state_dict(best_weights)
     print("Testing...")
@@ -223,7 +227,9 @@ def main():
     print("train_loss=", "{:.5f}".format(train_loss.avg),
           "train_acc=", "{:.5f}".format(1 - train_err.avg),
           "test_loss=", "{:.5f}".format(test_loss.avg),
-          "test_acc=", "{:.5f}".format(1 - test_err.avg))
+          "test_acc=", "{:.5f}".format(1 - test_err.avg),
+          "best_epoch", "{:.5f}".format(best_epoch)
+          )
     print()
 
     errs.append(test_err.avg.cpu())
@@ -233,11 +239,11 @@ def main():
     if args.save_logs:
         print('Saving logs...')
         data = {
-            'score': 1 - test_err.avg,
+            'score': 1 - test_err.avg.cpu(),
             'best_epoch': best_epoch,
             'best_loss': best_loss,
-            'train_acc': 1 - train_err.avg,
-            'val_score': best_acc,
+            'train_acc': 1 - train_err.avg.cpu(),
+            'val_score': best_acc.cpu(),
             'args': args
             }
         np.save(os.path.join(args.outdir, f"seed_{args.seed}_results.npy"),

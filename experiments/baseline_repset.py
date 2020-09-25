@@ -100,7 +100,9 @@ def main():
     X_train = X_train.permute(0, 2, 1).numpy()
     X_test = X_test.permute(0, 2, 1).numpy()
 
-    n_train = y_train.shape[0]
+    n_train = int(0.8 * X_train.shape[0])
+    n_val = X_train.shape[0] - n_train
+    # n_train = y_train.shape[0]
     n_test = y_test.shape[0]
 
     idx = np.random.permutation(n_train)
@@ -111,6 +113,14 @@ def main():
         train_batches.append((X_train[idx[i * args.batch_size:min((i+1) * args.batch_size, n_train)]],
                               y_train[idx[i * args.batch_size:min((i+1) * args.batch_size, n_train)]]))
 
+    idx = np.random.permutation(range(n_train, X_train.shape[0]))
+    n_val_batches = ceil(n_val / args.batch_size)
+    val_batches = list()
+
+    for i in range(n_val_batches):
+        val_batches.append((X_train[idx[i * args.batch_size:min((i+1) * args.batch_size, n_val)]],
+                              y_train[idx[i * args.batch_size:min((i+1) * args.batch_size, n_val)]]))
+
     n_test_batches = ceil(n_test/args.batch_size)
     test_batches = list()
     for i in range(n_test_batches):
@@ -119,21 +129,41 @@ def main():
 
     model = RepSet(args.lr, args.heads, args.out_size, args.dim_hidden, n_classes=2)
 
+    best_loss = float('inf')
     for epoch in range(args.epochs):
 
         train_loss = AverageMeter()
         train_err = AverageMeter()
-
+        
         for X, y in train_batches:
             y_ = np.zeros((y.size, y.max()+1)) # added that
             y_[np.arange(y.size),y] = 1 # added that
             y_pred = model.train(X, y_)
-            train_loss.update(log_loss(y_, y_pred), y_train.size)
+            train_loss.update(log_loss(y_, y_pred), n_train)
             train_err.update(1-accuracy_score(np.argmax(y_, axis=1), np.argmax(y_pred, axis=1)), y_.shape[0])
 
-        print("epoch:", '%03d' % (epoch+1), "train_loss=", "{:.5f}".format(train_loss.avg),
-            "train_err=", "{:.5f}".format(train_err.avg))
+        val_loss = AverageMeter()
+        val_acc = AverageMeter()
 
+        for X, y in val_batches:
+            y_ = np.zeros((y.size, y.max()+1)) # added that
+            y_[np.arange(y.size),y] = 1 # added that
+            y_pred = model.test(X)
+            val_loss.update(log_loss(y_, y_pred), n_val)
+            val_acc.update(accuracy_score(np.argmax(y_, axis=1), np.argmax(y_pred, axis=1)), y_.shape[0])
+
+        if val_loss.avg < best_loss:
+            best_loss = val_loss.avg
+            best_acc = val_acc.avg
+            best_epoch = epoch + 1
+            best_model = copy.deepcopy(model)
+
+        print("epoch:", '%03d' % (epoch+1), "train_loss=", "{:.5f}".format(train_loss.avg),
+            "train_acc=", "{:.5f}".format(1 - train_err.avg), "val_loss= {}".format(val_loss.avg),
+            "val_acc= {}".format(val_acc.avg)
+            )
+
+    print("Testing...")
     test_loss = AverageMeter()
     test_err = AverageMeter()
 
@@ -142,22 +172,31 @@ def main():
         y_[np.arange(y.size),y] = 1 # added that
         y_test_ = np.zeros((y_test.size, y_test.max()+1)) # added that
         y_test_[np.arange(y_test.size),y_test] = 1 # added that
-        y_pred = model.test(X)
+        y_pred = best_model.test(X)
 
         test_loss.update(log_loss(y_, y_pred), y_test_.size)
         test_err.update(1-accuracy_score(np.argmax(y_, axis=1), np.argmax(y_pred, axis=1)), y_.shape[0])
 
     print("train_loss=", "{:.5f}".format(train_loss.avg),
-        "train_err=", "{:.5f}".format(train_err.avg), "test_loss=", "{:.5f}".format(test_loss.avg), "test_err=", "{:.5f}".format(test_err.avg))
+          "train_acc=", "{:.5f}".format(1 - train_err.avg),
+          "test_loss=", "{:.5f}".format(test_loss.avg),
+          "test_acc=", "{:.5f}".format(1 - test_err.avg),
+          "best_epoch=", "{:.5f}".format(best_epoch) 
+        )
     print()
 
-    print("Test acc:", "{:.5f}".format(1 - test_err.avg))
+    errs.append(test_err.avg)
+
+    print("Average accuracy:", "{:.5f}".format(1 - np.mean(errs)))
 
     if args.save_logs:
         print('Saving logs...')
         data = {
             'score': 1 - test_err.avg,
+            'best_epoch': best_epoch,
+            'best_loss': best_loss,
             'train_acc': 1 - train_err.avg,
+            'val_score': best_acc,
             'args': args
             }
         np.save(os.path.join(args.outdir, f"seed_{args.seed}_results.npy"),
