@@ -16,10 +16,11 @@ from timeit import default_timer as timer
 
 def load_args():
     parser = argparse.ArgumentParser(
-        description="unsup OT kernel for SST2",
+        description="unsup OT kernel for SST2 and RTE",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', choices=['sst-2_bert_mask',
-                                              'sst-2_proto'],
+                                              'sst-2_proto',
+                                              'rte_bert'],
                         default='sst-2_bert_mask')
     parser.add_argument(
         '--seed', type=int, default=1, help='random seed')
@@ -268,6 +269,7 @@ def main():
 
     print("Finished, elapsed time: {:.2f}s".format(toc - tic))
 
+    print('Baseline: ', torch.unique(y_val, return_counts=True))
     test_dset = TensorDataset(X_val.permute(0, 2, 1), y_val)
     test_loader = DataLoader(
         test_dset, batch_size=args.batch_size, shuffle=False)

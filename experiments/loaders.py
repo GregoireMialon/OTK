@@ -19,7 +19,7 @@ def load_cifar_features(path, one_vs_all=None):
     return X, y, X_val, y_val, X_test
 
 
-def load_sst2_features(dataset):
+def load_transformers_features(dataset):
     if dataset == 'sst-2_bert':
         data_train = np.load('sst-2/sst_train_bert-base-uncased.npz')
         data_val = np.load('../data/sst-2/sst_val_bert-base-uncased.npz')
@@ -56,12 +56,15 @@ def load_sst2_features(dataset):
         data_train = np.load('../data/sst-2/sst_train_66_bert-base-uncased_finetuned.npz')
         data_val = np.load('../data/sst-2/sst_val_66_bert-base-uncased_finetuned.npz')
         data_test = np.load('../data/sst-2/sst_test_66_bert-base-uncased_finetuned.npz')
-    elif dataset == 'sst-2_roberta-base':
-        data_train = np.load('../data/sst-2/sst_train_roberta-base.npz')
-        data_val = np.load('../data/sst-2/sst_val_roberta-base.npz')
-        data_test = np.load('../data/sst-2/sst_test_roberta-base.npz')
+    elif dataset == 'rte_bert':
+        data_train = np.load('../data/rte/rte_train_bert-base-uncased_mask.npz')
+        data_val = np.load('../data/rte/rte_val_bert-base-uncased_mask.npz')
+        data_test = np.load('../data/rte/rte_test_bert-base-uncased_mask.npz')
     # the above operation is fast.
     X_train, y_train = data_train['X'], data_train['y'] # this is where things are slow.
+    if dataset == 'rte_bert':
+        X_train = np.delete(X_train, 2164, 0)
+        y_train = np.delete(y_train, 2164)
     X_val, y_val = data_val['X'], data_val['y']
     X_test = data_test['X']
     X_train = torch.from_numpy(X_train)
@@ -80,8 +83,8 @@ def load_data(dataset):
     elif dataset == 'cifar_5k_8k':
         X_train, y_train, X_val, y_val, X_test = load_cifar_features(
             '../data/cifar-10/ckn512_8192.npz')
-    elif 'sst-2' in dataset:
-        X_train, y_train, X_val, y_val, X_test = load_sst2_features(dataset)
+    else:
+        X_train, y_train, X_val, y_val, X_test = load_transformers_features(dataset)
     print('Train', X_train.shape, y_train.shape)
     print('Val', X_val.shape, y_val.shape)
     print('Test', X_test.shape)
@@ -89,20 +92,30 @@ def load_data(dataset):
 
 
 def load_masks(dataset):
-    if '66' in dataset:
-        mask_length = 66
-    else:
-        mask_length = 30
+    '''Length  of mask deprecated: change name and/or update code
+    '''
+    to_load = '../data/'
+    if 'rte' in dataset:
+        to_load = os.path.join(to_load, 'rte', dataset) 
+    elif 'sst' in dataset:
+        to_load = os.path.join(to_load, 'sst', dataset) 
     X_val_mask = torch.from_numpy(np.load(
-        '../data/sst-2/sst_val_bert_{}_mask.npz'.format(mask_length))['masks']
+        '{}_val_mask.npz'.format(to_load))['masks']
         ).unsqueeze(dim=-1)
     if 'proto' in dataset:
         X_tr_mask = X_val_mask
     else:
         X_tr_mask = torch.from_numpy(np.load(
-            '../data/sst-2/sst_train_bert_{}_mask.npz'.format(mask_length)
-            )['masks']).unsqueeze(dim=-1)
+        '{}_train_mask.npz'.format(to_load))['masks']
+        ).unsqueeze(dim=-1)
+        if dataset == 'rte_bert':
+            X_tr_mask = np.delete(X_tr_mask, 2164, 0) 
     X_test_mask = torch.from_numpy(np.load(
-        '../data/sst-2/sst_test_bert_{}_mask.npz'.format(mask_length))['masks']
+        '{}_test_mask.npz'.format(to_load))['masks']
         ).unsqueeze(dim=-1)
     return X_tr_mask, X_val_mask, X_test_mask
+
+if __name__ == "__main__":
+    print(load_masks('rte_bert'))
+    print(np.load('../data/rte/rte_train_bert-base-uncased_mask.npz'))
+
