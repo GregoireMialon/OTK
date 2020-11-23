@@ -43,9 +43,6 @@ def load_args():
         "--sampling-patches", default=300000, type=int,
         help="number of sampled patches")
     parser.add_argument(
-        "--weight-decay", type=float, default=0.0001,
-        help="weight decay for classifier")
-    parser.add_argument(
         '--eps', type=float, default=1.0, help='eps for Sinkhorn')
     parser.add_argument(
         '--heads', type=int, default=1,
@@ -99,9 +96,9 @@ def load_args():
                 os.makedirs(outdir)
             except:
                 pass
-        outdir = outdir + '/{}_{}_{}_{}_{}_{}'.format(
+        outdir = outdir + '/{}_{}_{}_{}_{}'.format(
             args.max_iter, args.eps, args.out_size, args.heads,
-            args.weight_decay, args.wb)
+            args.wb)
         if not os.path.exists(outdir):
             try:
                 os.makedirs(outdir)
@@ -199,9 +196,8 @@ def main():
 
     model = SeqAttention(
         768, 2, args.n_filters, args.len_motifs, args.subsamplings,
-        kernel_args=args.kernel_params, alpha=args.weight_decay,
-        eps=args.eps, heads=args.heads, out_size=args.out_size,
-        max_iter=args.max_iter, fit_bias=False)
+        kernel_args=args.kernel_params, eps=args.eps, heads=args.heads,
+        out_size=args.out_size, max_iter=args.max_iter, fit_bias=False)
     print(model)
     print(len(train_dset))
 
@@ -231,7 +227,7 @@ def main():
     Xval.append(X)
     yval.append(y)
 
-    search_grid = 2. ** np.arange(1, 15)
+    search_grid = 2. ** np.arange(-2, 15)
     search_grid = 1. / search_grid
     best_score = -np.inf
     clf = model.classifier
@@ -280,7 +276,7 @@ def main():
         Xte = Xte.cuda()
     with torch.no_grad():
         y_pred = clf(Xte).cpu()
-
+    # print('Predictions: ', y_pred)
     scores = accuracy(y_pred, y_true)
     print(scores)
 
