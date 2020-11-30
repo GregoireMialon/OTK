@@ -12,8 +12,8 @@ from torch.utils.data import (DataLoader, RandomSampler,
 from torch import nn
 from transformers import (BertTokenizer, AdamW, BertConfig,
                           get_linear_schedule_with_warmup,
-                          BertForSequenceClassification
-                          )
+                          BertConfig)
+from otk.models_nlp import BertMeanPool
 
 
 class Dataset(Dataset):
@@ -85,6 +85,8 @@ def load_args():
         '--model', type=str, default='bert-base-uncased', choices=['bert-base-uncased', 'bert-large-uncased'],
         help='model of transformer')
     parser.add_argument(
+        '--n_hidden', type=int, default=0, help='number of hidden neurons in the classifier')
+    parser.add_argument(
         '--seed', type=int, default=1, help='random_seed')
     parser.add_argument(
         '--epochs', type=int, default=5, help='number of training epochs')
@@ -119,9 +121,9 @@ def load_args():
             except:
                 pass
         if args.model == 'bert-base-uncased':
-            outdir = outdir + "/bert"
+            outdir = outdir + f"/bert_{args.n_hidden}"
         else:
-            outdir = outdir + f"/{args.model}".replace('-', '_')
+            outdir = outdir + f"/{args.model}_{args.n_hidden}".replace('-', '_')
         if not os.path.exists(outdir):
             try:
                 os.makedirs(outdir)
@@ -148,9 +150,9 @@ def main():
         DATASET_PATH = '/services/scratch/thoth/gmialon/dataset/rte/RTE'
 
     device = torch.device('cuda')
-    model = BertForSequenceClassification.from_pretrained(args.model, num_labels=2,
-                                                          output_attentions=False, output_hidden_states=True)
-
+    config = BertConfig(args.model)
+    model = BertMeanPool(args.model, nclass=2, fit_bias=True, mask_zeros=True, num_out=args.maxlen*config.hidden_size,
+                         n_hidden=args.n_hidden)
     model.cuda()
     tokenizer = BertTokenizer.from_pretrained(args.model)
 
@@ -183,6 +185,8 @@ def main():
 
     # Measure the total training time for the whole run.
     total_t0 = time.time()
+
+    criterion = nn.CrossEntropyLoss()
 
     for epoch_i in range(0, args.epochs):
 
@@ -230,9 +234,8 @@ def main():
             b_labels = batch[2].to(device).long()
 
             model.zero_grad()
-            outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_input_mask,
-                            labels=b_labels)
-            loss = outputs.loss
+            output = model(b_input_ids, b_input_mask)
+            loss = criterion(output, b_labels)
             total_train_loss += loss.item()
 
             loss.backward()
@@ -274,11 +277,10 @@ def main():
             b_labels = batch[2].to(device).long()
 
             with torch.no_grad():
-                outputs = model(b_input_ids, token_type_ids=None,
-                                attention_mask=b_input_mask, labels=b_labels)
-            loss = outputs.loss
+                output = model(b_input_ids, b_input_mask)
+            loss = criterion(output, b_labels)
             total_eval_loss += loss.item()
-            logits = outputs.logits.detach().cpu().numpy()
+            logits = output.detach().cpu().numpy()
             label_ids = b_labels.to('cpu').numpy()
 
             total_eval_accuracy += flat_accuracy(logits, label_ids)

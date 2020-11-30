@@ -13,11 +13,11 @@ from torch import nn
 from transformers import (BertTokenizer, AdamW, BertConfig,
                           get_linear_schedule_with_warmup
                           )
-from otk.models import BertOTK
+from otk.models_nlp import BertOTK
 
 
 class Dataset(Dataset):
-
+    # TODO: make it generic in order to include models other than bert
     def __init__(self, filename, tokenizer, maxlen, test=False):
 
         # Store the contents of the file in a pandas dataframe
@@ -82,6 +82,9 @@ def load_args():
     parser.add_argument(
         '--dataset', type=str, default='sst-2_bert_mask', help='data set for experiment')
     parser.add_argument(
+        '--model', type=str, default='bert-base-uncased', choices=['bert-base-uncased', 'bert-large-uncased'],
+        help='transformer model')
+    parser.add_argument(
         '--seed', type=int, default=1, help='random_seed')
     parser.add_argument(
         '--heads', type=int, default=1, help='number of references in OTK')
@@ -129,6 +132,12 @@ def load_args():
                 os.makedirs(outdir)
             except:
                 pass
+        outdir = outdir + f"/{args.model}".replace('-', '_')
+        if not os.path.exists(outdir):
+            try:
+                os.makedirs(outdir)
+            except:
+                pass
         outdir = outdir + '/otk_{}_{}_{}_{}'.format(
             args.heads, args.out_size, args.eps, args.max_iter)
         if not os.path.exists(outdir):
@@ -157,14 +166,11 @@ def main():
         DATASET_PATH = '/services/scratch/thoth/gmialon/dataset/rte/RTE'
 
     device = torch.device('cuda')
-    pretrained_model = 'bert-base-uncased'
-    #model = BertForSequenceClassification.from_pretrained(pretrained_model, num_labels=2,
-    #                                                      output_attentions=False, output_hidden_states=True)
     model = BertOTK(out_size=args.out_size, heads=args.heads, eps=args.eps, max_iter=args.max_iter, 
-                    pretrained_model='bert-base-uncased', nclass=2, fit_bias=True, mask_zeros=True)
+                    pretrained_model=args.model, nclass=2, fit_bias=True, mask_zeros=True)
 
     model.cuda()
-    tokenizer = BertTokenizer.from_pretrained(pretrained_model)
+    tokenizer = BertTokenizer.from_pretrained(args.model)
 
     train_set = Dataset(filename=os.path.join(DATASET_PATH, 'train.tsv'), tokenizer=tokenizer, maxlen=args.maxlen)
     val_set = Dataset(filename=os.path.join(DATASET_PATH, 'dev.tsv'), tokenizer=tokenizer, maxlen=args.maxlen)
