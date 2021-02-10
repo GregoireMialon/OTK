@@ -12,8 +12,7 @@ TLDR; the paper demonstrates the advantage of our OTK Embedding over usual aggre
 
 The principal module is implemented in `otk/layers.py` as `OTKernel`. It is generally used with a non-linear layer. Combined with the non-linear layer, it takes a sequence or image tensor as input, and performs a non-linear embedding and an adaptive pooling (attention + pooling) based on optimal transport. Specifically, given a sequence x as input, it first computes the optimal transport plan from x to some reference z (left figure). The optimal transport plan, interpreted as the attention score, is then used to obtain a new sequence of the same size as z following a non-linear mapping (right figure). See more details in our [paper][1].
 
-![otk](figs/otk2.png)
-![otk](figs/otk1.png)
+![otk](figs/otk.png)
 
 OTKernel can be trained in either **unsupervised** (with K-means) or **supervised** (like the multi-head self-attention module in Transformer) fashions. It can be used as a module in neural networks, or alone as a kernel method.
 
